@@ -8,6 +8,7 @@ from netCDF4 import Dataset
 import xarray as xr
 from datetime import datetime, timedelta
 import metpy.calc as mpcalc
+from metpy.units import units
 
 
 def get_raobs(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), pres_lev=None):
@@ -63,7 +64,7 @@ def get_raobs(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,mi
 
     name = data['staName'][:]
     name = name[to_keep]
-    name = [i.tostring().decode()[:4] for i in name]
+    name = [i.tobytes().decode('utf-8', errors='ignore').strip('\x00')[:4] for i in name]
     u,v = mpcalc.wind_components((wspd*units('m/s')).to('knots'),wdir*units.degree)
 
     #create xarray dataset
@@ -83,7 +84,7 @@ def get_raobs(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,mi
             )
     )
 
-    if plev:
+    if pres_lev:
         #select data
         ds = select_pressure_level(ds, pres_lev)
     return(ds)
