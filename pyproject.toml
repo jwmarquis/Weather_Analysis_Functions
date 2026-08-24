@@ -13,6 +13,11 @@ dependencies = [
     "xarray",
     "numpy",
     "matplotlib",
+    "metpy",
+    "netCDF4",
+    "gzip",
+    "requests",
+    "shutil",
 ]
 
 [tool.setuptools.packages.find]
