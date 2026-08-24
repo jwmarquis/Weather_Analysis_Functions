@@ -10,11 +10,11 @@ from datetime import datetime, timedelta
 import metpy.calc as mpcalc
 
 
-def get_raobs(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), pres_lev):
+def get_raobs(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), pres_lev=None):
     del_t = datetime.now() - dt
     del_t_days = del_t.days + (del_t.seconds/60/60/24)
     #get data from MADIS
-    if del_t_days>:
+    if del_t_days>3:
         base_url = 'https://madis-data.cprk.ncep.noaa.gov/madisPublic1/data/archive/'
         url = f'{base_url}{dt:%Y}/{dt:%m}/{dt:%d}/point/raob/netcdf/{dt:%Y%m%d_%H%M}.gz'
     else:
@@ -82,4 +82,22 @@ def get_raobs(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,mi
             v=(['id','pres'],v)
             )
     )
+
+    if plev:
+        #select data
+        ds = select_pressure_level(ds, pres_lev)
     return(ds)
+
+def select_pressure_level(ds, pres_lev):
+    mask = ds['pressure'] == pres_lev
+    level_vars = [v for v in ds.data_vars if 'pres' in ds[v].dims]
+    
+    ds_masked = ds[level_vars].where(mask)
+    ds_lev = ds_masked.max(dim='pres', skipna=True)  # collapses to the one matching value per station
+    
+    # reattach vars that don't vary with pres (lon, lat)
+    for v in ds.data_vars:
+        if v not in level_vars:
+            ds_lev[v] = ds[v]
+    
+    return ds_lev
