@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wx_analysis_fncs"
+version = "0.1.0"
+description = "Weather model data access and plotting helpers"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "herbie-data",
+    "xarray",
+    "numpy",
+    "matplotlib",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+wx_analysis_fcns = ["data/county_shape_file/*"]
+
