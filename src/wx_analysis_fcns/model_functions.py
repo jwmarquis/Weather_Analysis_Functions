@@ -37,7 +37,7 @@ class DataAvailabilityError(RuntimeError):
     """Requested data are not available for the given date/model."""
     pass
 
-def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), model="gfs", fxx=0, bbox=[15,-170,75,-50], product=None, resolution=None):
+def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), model="gfs", fxx=0, bbox=[15,-170,75,-50], product=None, resolution=None, member=None):
     model = model.lower()
 
     #############
@@ -64,6 +64,28 @@ def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second
             else:
                 product = '0.5-degree'
         ds = read_gfs(dt, product, fxx, bbox)
+
+    ##############
+    #### GEFS ####
+    ##############
+    if model == "gefs":
+        if dt < GEFS_AWS_START:
+            raise DataAvailabilityError(
+                f"GEFS is unavailable before {GEFS_AWS_START:%Y-%m-%d}. "+
+                f"Requested time: {dt:%Y-%m-%d %H:%M}."
+            )
+        if product:
+            pass
+        elif resolution:
+            product = 'atmos.25' if resolution<0.5 else 'atmos.5'
+        else:
+            product = 'atmos.5'
+
+        if member:
+            pass
+        else:
+            member=1
+        ds = read_gefs(dt, product, fxx, bbox, member)
 
     #############
     #### RAP ####
