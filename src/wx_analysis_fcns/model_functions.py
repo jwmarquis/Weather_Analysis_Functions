@@ -51,7 +51,7 @@ def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second
     #### GEFS ####
     ##############
     if model == "gefs":
-        if dt < GEFS_AWS_START:
+        if dt < GEFS_START:
             raise DataAvailabilityError(
                 f"GEFS is unavailable before {GEFS_AWS_START:%Y-%m-%d}. "+
                 f"Requested time: {dt:%Y-%m-%d %H:%M}."
