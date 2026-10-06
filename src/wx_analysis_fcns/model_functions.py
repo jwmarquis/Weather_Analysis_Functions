@@ -436,7 +436,7 @@ def read_gefs(dt, product, fxx, bbox, member):
     lat2d, lon2d = xr.broadcast(ds.latitude,ds.longitude)
     ds = ds.assign_coords(latitude=lat2d, longitude=lon2d)
 
-    ds = ds.expand_dims(member=[member])
+    #ds = ds.expand_dims(member=[member])
     
     return ds
 
