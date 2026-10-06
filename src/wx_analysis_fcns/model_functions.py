@@ -20,6 +20,28 @@ class DataAvailabilityError(RuntimeError):
 
 def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), model="gfs", fxx=0, bbox=[15,-170,75,-50], product=None, resolution=None):
     model = model.lower()
+    ############################
+    #### RDA SSL WORKAROUND ####
+    ############################
+    #### TEMPORARY (added 2026-10-06): data.rda.ucar.edu is serving an invalid
+    #### self-signed cert (issued for gridftp03.ucar.edu). Skips verification for
+    #### that host ONLY so Herbie can reach the pre-2021 GFS archive.
+    #### NOT a general fix for SSL errors. REMOVE once NCAR fixes the cert.
+    import requests
+    import urllib3
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+    _orig_request = requests.Session.request
+
+    def _rda_request(self, method, url, **kwargs):
+        if 'rda.ucar.edu' in url:
+            kwargs['verify'] = False
+        return _orig_request(self, method, url, **kwargs)
+
+    requests.Session.request = _rda_request
+
+
     #############
     #### GFS ####
     #############
