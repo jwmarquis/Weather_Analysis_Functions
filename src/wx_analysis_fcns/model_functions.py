@@ -132,6 +132,13 @@ def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second
             product = "prs"
         ds = read_hrrr(dt, product, fxx, bbox)
 
+    ds.attrs['model'] = model
+    ds.attrs['product'] = product
+    if model == "gefs":
+        ds.attrs['member'] = member
+
+    return ds
+
     return ds
 
 def subset_bbox(ds, bbox):
