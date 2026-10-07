@@ -249,11 +249,9 @@ def read_gfs(dt, product, fxx, bbox):
     ds = ds.assign_coords(latitude=lat2d, longitude=lon2d)
 
     if H.idx is None:
-        ds.attrs['model'] = model
+        ds.attrs['model'] = 'gfs'
         ds.attrs['product'] = product
-        
-    
-    
+           
     return ds
 
 
