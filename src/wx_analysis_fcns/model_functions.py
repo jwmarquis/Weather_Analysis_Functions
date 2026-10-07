@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from herbie import Herbie
+import herbie.models.gfs as _herbie_gfs
 from datetime import datetime, timedelta
 import xarray as xr
 xr.set_options(use_new_combine_kwarg_defaults=True)
@@ -18,6 +19,20 @@ GEFS_START = datetime(2007,1,1,0)
 class DataAvailabilityError(RuntimeError):
     """Requested data are not available for the given date/model."""
     pass
+
+#############################
+#### HERBIE GDEX DOMAIN ####
+#############################
+#### NCAR renamed data.rda.ucar.edu -> data.gdex.ucar.edu. Herbie's GFS
+#### template still uses the old domain. REMOVE once Herbie is updated.
+_orig_gfs_template = _herbie_gfs.gfs.template
+def _gdex_gfs_template(self):
+    _orig_gfs_template(self)
+    self.SOURCES = {
+        k: v.replace('data.rda.ucar.edu', 'data.gdex.ucar.edu')
+        for k, v in self.SOURCES.items()
+    }
+_herbie_gfs.gfs.template = _gdex_gfs_template
 
 def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second=0,minute=0), model="gfs", fxx=0, bbox=[15,-170,75,-50], product=None, resolution=None, member=None):
     model = model.lower()
