@@ -199,19 +199,21 @@ def subset_bbox(ds, bbox):
 #################################################################
 def read_gfs(dt, product, fxx, bbox):  
     dt_str = dt.strftime('%Y-%m-%d %H:%M')
-    H = Herbie(
-        dt_str,
+    
+    herbie_kwargs = dict(
         model='gfs',
-        product=product, #0.25 deg res common fields
+        product=product,
         bbox=bbox,
         fxx=fxx,
     )
+    
+    H = Herbie(dt_str,**herbie_kwargs)
 
     #### pre-2021 GDEX files have no index files: download the full ####
     #### file, then remake Herbie so it inventories the local copy  ####
     if H.grib is not None and H.idx is None:
         H.download()
-        H = Herbie(dt_str, **herbie_kwargs)
+        H = Herbie(dt_str,**herbie_kwargs)
     
     regex_sfc = r":(?:PRES|PRMSL|HGT|RH|TMP|UGRD|VGRD):(?:mean sea level|2 m above ground|10 m above ground|surface):"
     regex_pl = r":(?:PRES|HGT|RH|TMP|UGRD|VGRD):\d+ mb:"
