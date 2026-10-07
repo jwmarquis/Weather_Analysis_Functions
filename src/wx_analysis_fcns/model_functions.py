@@ -7,12 +7,12 @@ import xarray as xr
 xr.set_options(use_new_combine_kwarg_defaults=True)
 import numpy as np
 
-GFS_START = datetime(2007,1,1,0)
+GFS_START = datetime(2015,1,15,0)
 RAP_AWS_START = datetime(2021,2,22,0)
 NAM_AWS_START = datetime(2021,9,16,0)
 HRRR_AWS_START = datetime(2014,7,30,18)
 
-GEFS_START = datetime(2007,1,1,0)
+GEFS_START = datetime(2017,1,1,0)
 
 class DataAvailabilityError(RuntimeError):
     """Requested data are not available for the given date/model."""
@@ -132,13 +132,6 @@ def get_model_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second
             product = "prs"
         ds = read_hrrr(dt, product, fxx, bbox)
 
-    ds.attrs['model'] = model
-    ds.attrs['product'] = product
-    if model == "gefs":
-        ds.attrs['member'] = member
-
-    return ds
-
     return ds
 
 def subset_bbox(ds, bbox):
@@ -220,6 +213,7 @@ def read_gfs(dt, product, fxx, bbox):
         #### pre-2021 GDEX files have no index files: download the ####
         #### full file and read it directly with cfgrib            ####
         H.download()
+        product = "pgrb2.0p25"
         ds_sfc, ds_pl = _read_full_grib(H.get_localFilePath())
     else:
         regex_sfc = r":(?:PRES|PRMSL|HGT|RH|TMP|UGRD|VGRD):(?:mean sea level|2 m above ground|10 m above ground|surface):"
@@ -253,6 +247,12 @@ def read_gfs(dt, product, fxx, bbox):
     #now make lat/lon 2d:
     lat2d, lon2d = xr.broadcast(ds.latitude,ds.longitude)
     ds = ds.assign_coords(latitude=lat2d, longitude=lon2d)
+
+    if H.idx is None:
+        ds.attrs['model'] = model
+        ds.attrs['product'] = product
+        
+    
     
     return ds
 
