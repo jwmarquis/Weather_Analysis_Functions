@@ -14,8 +14,6 @@ HRRR_AWS_START = datetime(2014,7,30,18)
 
 GEFS_START = datetime(2007,1,1,0)
 
-
-
 class DataAvailabilityError(RuntimeError):
     """Requested data are not available for the given date/model."""
     pass
@@ -199,40 +197,43 @@ def subset_bbox(ds, bbox):
 #################################################################
 def read_gfs(dt, product, fxx, bbox):  
     dt_str = dt.strftime('%Y-%m-%d %H:%M')
-    
-    herbie_kwargs = dict(
+    H = Herbie(
+        dt_str,
         model='gfs',
         product=product,
         bbox=bbox,
         fxx=fxx,
     )
-    
-    H = Herbie(dt_str,**herbie_kwargs)
+    if H.grib is None:
+        raise DataAvailabilityError(
+            f"No GFS file found for {dt:%Y-%m-%d %H:%M} F{fxx:03d}."
+        )
 
-    #### pre-2021 GDEX files have no index files: download the full ####
-    #### file, then remake Herbie so it inventories the local copy  ####
-    if H.grib is not None and H.idx is None:
+    if H.idx is None:
+        #### pre-2021 GDEX files have no index files: download the ####
+        #### full file and read it directly with cfgrib            ####
         H.download()
-        H = Herbie(dt_str,**herbie_kwargs)
-    
-    regex_sfc = r":(?:PRES|PRMSL|HGT|RH|TMP|UGRD|VGRD):(?:mean sea level|2 m above ground|10 m above ground|surface):"
-    regex_pl = r":(?:PRES|HGT|RH|TMP|UGRD|VGRD):\d+ mb:"
+        ds_sfc, ds_pl = _read_full_grib(H.get_localFilePath())
+    else:
+        regex_sfc = r":(?:PRES|PRMSL|HGT|RH|TMP|UGRD|VGRD):(?:mean sea level|2 m above ground|10 m above ground|surface):"
+        regex_pl = r":(?:PRES|HGT|RH|TMP|UGRD|VGRD):\d+ mb:"
 
-    ds_sfc_list = H.xarray(regex_sfc)
-    ds_sfc = xr.merge(ds_sfc_list,compat="override")
+        ds_sfc_list = H.xarray(regex_sfc)
+        ds_sfc = xr.merge(ds_sfc_list,compat="override")
+
+        ds_pl_list = H.xarray(regex_pl)
+        if isinstance(ds_pl_list,list):
+            ds_pl = xr.merge(ds_pl_list,compat="override")
+        else:
+            ds_pl = ds_pl_list
+
     ds_sfc = ds_sfc.rename({
         "t": "ts",
+        "t2m": "t2",
         "sp": "ps",
         "r2": "rh2",
         "prmsl": "pmsl",
     })
-
-    ds_pl_list = H.xarray(regex_pl)
-    if isinstance(ds_pl_list,list):
-        ds_pl = xr.merge(ds_pl_list,compat="override")
-    else:
-        ds_pl = ds_pl_list
-    
     ds_pl = ds_pl.rename({
         "r": "rh",    
     })
@@ -259,7 +260,7 @@ def read_nam(dt, product, fxx, bbox):
         model='nam',
         product=product,
         bbox=bbox,
-        fxx=0,
+        fxx=fxx,
     )
     
     regex_sfc = r":(?:PRES|PRMSL|HGT|RH|TMP|UGRD|VGRD):(?:mean sea level|2 m above ground|10 m above ground|surface):"
@@ -417,6 +418,9 @@ def get_gefs_data(dt: datetime = datetime.utcnow().replace(microsecond=0,second=
     ds_ens = xr.concat(ds_list, dim="member", compat="override")  
     return(ds_ens)
 
+#################################################################
+############################## GEFS #############################
+#################################################################
 def read_gefs(dt, product, fxx, bbox, member):  
     dt_str = dt.strftime('%Y-%m-%d %H:%M')
     H = Herbie(
@@ -436,6 +440,7 @@ def read_gefs(dt, product, fxx, bbox, member):
     ds_sfc = ds_sfc.rename({
         "sp": "ps",
         "r2": "rh2",
+        "t2m": "t2",
         "prmsl": "pmsl",
     })
 
@@ -502,3 +507,35 @@ def compute_wind_skip(ds, bbox, fig, target_barbs=30):
     skip = max(1, int(round(barb_spacing_km / dx_km)))
 
     return skip
+
+def _open_cfgrib(grib_path, filter_keys, var_names):
+    ds = xr.open_dataset(
+        grib_path,
+        engine='cfgrib',
+        backend_kwargs={'filter_by_keys': filter_keys},
+        decode_timedelta=True,
+    )
+    keep = [v for v in var_names if v in ds.data_vars]
+    ds = ds[keep]
+    #### drop scalar level coords so merges don't conflict ####
+    return ds.drop_vars(['surface','meanSea','heightAboveGround'], errors='ignore')
+
+def _read_full_grib(grib_path):
+    #### surface-type fields (equivalent to regex_sfc) ####
+    ds_sfc_list = [
+        _open_cfgrib(grib_path, {'typeOfLevel':'surface','stepType':'instant'}, ['sp','t','orog']),
+        _open_cfgrib(grib_path, {'typeOfLevel':'meanSea'}, ['prmsl']),
+        _open_cfgrib(grib_path, {'typeOfLevel':'heightAboveGround','level':2,'stepType':'instant'}, ['t2m','r2']),
+        _open_cfgrib(grib_path, {'typeOfLevel':'heightAboveGround','level':10,'stepType':'instant'}, ['u10','v10']),
+    ]
+    ds_sfc = xr.merge(ds_sfc_list,compat="override")
+
+    #### pressure-level fields (equivalent to regex_pl) ####
+    #### one variable at a time since levels can differ by variable ####
+    ds_pl_list = [
+        _open_cfgrib(grib_path, {'typeOfLevel':'isobaricInhPa','shortName':name}, [name])
+        for name in ['gh','t','r','u','v']
+    ]
+    ds_pl = xr.merge(ds_pl_list,compat="override",join="outer")
+
+    return ds_sfc, ds_pl
